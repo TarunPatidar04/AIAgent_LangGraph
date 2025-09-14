@@ -1,4 +1,4 @@
-# chatbot_langraph_codergyan
+# Custom AI Agent Using LangGraph
 
 To install dependencies:
 
