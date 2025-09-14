@@ -1,0 +1,11 @@
+{
+  "name": "chatbot_langraph_codergyan",
+  "module": "index.js",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
