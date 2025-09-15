@@ -3,6 +3,14 @@ import { MessagesAnnotation, StateGraph } from "@langchain/langgraph";
 import readline from "readline/promises";
 import dotenv from "dotenv";
 dotenv.config();
+import { ToolNode } from "@langchain/langgraph/prebuilt";
+import { SerpAPI } from "@langchain/community/tools/serpapi";
+
+const serpApiTool = new SerpAPI(process.env.SERPAPI_KEY);
+
+// initilize the tools node
+const tools = [serpApiTool];
+const toolNode = new ToolNode(tools);
 
 /**
   1. Define a node function 
@@ -10,7 +18,6 @@ dotenv.config();
   3. compile and invoke the graph
 
  */
-
 // Initilize the LLM
 const llm = new ChatGroq({
   model: "openai/gpt-oss-120b",
@@ -18,21 +25,38 @@ const llm = new ChatGroq({
   //   maxTokens: undefined,
   maxRetries: 2,
   apiKey: process.env.GROQ_API_KEY,
-});
+}).bindTools([serpApiTool]);
 
 // 1. Define a node function
 async function callModel(state) {
   // call the LLM using APIs
   const response = await llm.invoke(state.messages);
-  console.log("Calling the Model");
+  console.log("Calling LLM....");
   return { messages: [response] };
+}
+
+// contional edges
+function shouldContinue(state) {
+  // put your condtion
+  // wether to call a tool or end
+  const lastMessage = state.messages[state.messages.length - 1];
+
+  if (lastMessage?.tool_calls?.length > 0) {
+    // LLM requested a tool
+    return "tools";
+  }
+  console.log("shld state", state);
+  return "__end__";
 }
 
 // 2 Build the graph
 const workflow = new StateGraph(MessagesAnnotation)
   .addNode("agent", callModel)
+  .addNode("tools", toolNode)
   .addEdge("__start__", "agent")
-  .addEdge("agent", "__end__");
+  .addEdge("tools", "agent")
+  .addConditionalEdges("agent", shouldContinue)
+  .addEdge("tools", "agent");
 
 // 3. compile and invoke the graph
 const app = workflow.compile();
@@ -58,7 +82,7 @@ async function main() {
       messages: [{ role: "user", content: userInput }],
     });
     const lastMessages = finalState.messages[finalState.messages.length - 1];
-    console.log(`AI :`,lastMessages.content);
+    console.log(`AI :`, lastMessages.content);
   }
 
   rl.close();
